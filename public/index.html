@@ -1,14 +1,238 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>PI Wallet BOT</title>
-    <script type="module" crossorigin src="/assets/index-2q_ZBuWG.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-DWRnL3_4.css">
-  </head>
-  <body>
-    <div id="root"></div>
-  </body>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Liope Bot Dashboard</title>
+    <!-- Load Stellar SDK and BIP39 for client-side key generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stellar-sdk/11.3.0/stellar-sdk.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bip39/3.1.0/bip39.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 2em;
+            background-color: #f4f6f8;
+            color: #333;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+        .container {
+            width: 100%;
+            max-width: 600px;
+            background-color: #fff;
+            padding: 2em;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #1a1a1a;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 0.5em;
+            text-align: center;
+        }
+        .view { display: none; }
+        #login-view { display: block; }
+        .form-group { margin-bottom: 1.5em; }
+        label {
+            display: block;
+            margin-bottom: 0.5em;
+            font-weight: 500;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 0.75em;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-size: 1em;
+        }
+        button {
+            width: 100%;
+            padding: 0.85em 1.5em;
+            border: none;
+            border-radius: 4px;
+            color: #fff;
+            background-color: #007bff;
+            cursor: pointer;
+            font-size: 1.1em;
+            font-weight: bold;
+            transition: background-color 0.2s;
+        }
+        button:hover { background-color: #0056b3; }
+        #status-log {
+            background-color: #282c34;
+            color: #abb2bf;
+            padding: 1em;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            min-height: 100px;
+            font-family: "SF Mono", "Fira Code", "Consolas", monospace;
+            margin-top: 1em;
+        }
+        .public-key {
+            font-family: monospace;
+            background: #e9ecef;
+            padding: 0.5em;
+            border-radius: 4px;
+            word-wrap: break-word;
+        }
+        .error-msg {
+            color: #dc3545;
+            margin-top: 1em;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <!-- Login View -->
+        <div id="login-view" class="view">
+            <h1>Login with Passphrase</h1>
+            <div class="form-group">
+                <label for="passphrase">Wallet Passphrase (Mnemonic)</label>
+                <textarea id="passphrase" rows="3" placeholder="Enter your 12 or 24-word recovery phrase..."></textarea>
+            </div>
+            <button onclick="login()">Login</button>
+            <p id="login-error" class="error-msg"></p>
+        </div>
+
+        <!-- Dashboard View -->
+        <div id="dashboard-view" class="view">
+            <h1>Bot Dashboard</h1>
+            <div class="form-group">
+                <label>Main Wallet Public Key</label>
+                <div id="public-key" class="public-key"></div>
+            </div>
+            <div class="form-group">
+                <label for="sponsor-wallet-seed">Sponsor Wallet Seed (for fees)</label>
+                <input type="text" id="sponsor-wallet-seed" placeholder="Enter the secret key of the fee-paying wallet">
+            </div>
+            <div class="form-group">
+                <label for="unlock-timestamp">Unlock Timestamp (UTC)</label>
+                <input type="datetime-local" id="unlock-timestamp" step="1">
+            </div>
+            <button onclick="armBot()">Arm Bot</button>
+            
+            <h2>Live Status</h2>
+            <pre id="status-log">Awaiting action...</pre>
+        </div>
+    </div>
+
+    <script>
+        const loginView = document.getElementById('login-view');
+        const dashboardView = document.getElementById('dashboard-view');
+        const statusLog = document.getElementById('status-log');
+        const loginError = document.getElementById('login-error');
+        const publicKeyDiv = document.getElementById('public-key');
+
+        let mainWalletSecretKey = null;
+
+        function logStatus(message, data) {
+            const timestamp = new Date().toLocaleTimeString();
+            let logEntry = `[${timestamp}] ${message}`;
+            if (data) {
+                logEntry += `\n${JSON.stringify(data, null, 2)}`;
+            }
+            statusLog.textContent = logEntry;
+        }
+
+        async function login() {
+            const passphrase = document.getElementById('passphrase').value.trim();
+            loginError.textContent = '';
+
+            if (!bip39.validateMnemonic(passphrase)) {
+                loginError.textContent = 'Invalid passphrase. Please check your recovery phrase.';
+                return;
+            }
+
+            try {
+                const seed = await bip39.mnemonicToSeed(passphrase);
+                const keypair = StellarSdk.Keypair.fromRawEd25519Seed(seed.slice(0, 32));
+                
+                mainWalletSecretKey = keypair.secret();
+                
+                publicKeyDiv.textContent = keypair.publicKey();
+                loginView.style.display = 'none';
+                dashboardView.style.display = 'block';
+                
+                // Start polling status once logged in
+                setInterval(getStatus, 5000);
+                getStatus();
+
+            } catch (error) {
+                console.error(error);
+                loginError.textContent = 'Failed to derive key from passphrase. Please try again.';
+            }
+        }
+
+        async function armBot() {
+            const sponsorSeed = document.getElementById('sponsor-wallet-seed').value;
+            const unlockTimeValue = document.getElementById('unlock-timestamp').value;
+
+            if (!mainWalletSecretKey || !sponsorSeed || !unlockTimeValue) {
+                logStatus("Error: Sponsor seed and unlock time are required.");
+                return;
+            }
+
+            const unlockTimestamp = new Date(unlockTimeValue).toISOString();
+
+            const configPayload = {
+                main_wallet_seed: mainWalletSecretKey,
+                sponsor_wallet_seed: sponsorSeed,
+                unlock_timestamp: unlockTimestamp,
+            };
+
+            logStatus("1. Sending configuration...", configPayload);
+
+            try {
+                const configResponse = await fetch('/configure', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(configPayload),
+                });
+
+                const configResult = await configResponse.json();
+                if (!configResponse.ok) {
+                    throw new Error(configResult.error || `HTTP error! status: ${configResponse.status}`);
+                }
+                logStatus("Configuration successful.", configResult);
+
+                // --- If configuration is successful, immediately start the bot ---
+                logStatus("2. Sending start command...");
+                const startResponse = await fetch('/start', { method: 'POST' });
+                const startResult = await startResponse.json();
+                if (!startResponse.ok) {
+                    throw new Error(startResult.error || `HTTP error! status: ${startResponse.status}`);
+                }
+                logStatus("Bot is ARMED and running!", startResult);
+
+            } catch (error) {
+                logStatus(`Operation failed: ${error.message}`);
+            }
+        }
+        
+        async function getStatus() {
+            try {
+                const response = await fetch('/status');
+                const result = await response.json();
+                 if (!response.ok) {
+                    throw new Error(result.error || `HTTP error! status: ${response.status}`);
+                }
+                logStatus("Status refreshed.", result);
+            } catch (error) {
+                // Don't log error if it's just because we're not configured yet
+                if (error.message.includes("not configured")) {
+                    logStatus("Bot is waiting for configuration.");
+                } else {
+                    logStatus(`Failed to get status: ${error.message}`);
+                }
+            }
+        }
+    </script>
+</body>
 </html>
