@@ -41,7 +41,7 @@ func (s *Server) Run(port string) error {
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.Default()
 
-	// Setup routes
+	// Setup routes for the new bot controller
 	handlers := NewHandlers(s.bot)
 	router.POST("/start", handlers.Start)
 	router.POST("/stop", handlers.Stop)
