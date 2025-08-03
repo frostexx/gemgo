@@ -18,14 +18,14 @@ type BotConfig struct {
 }
 
 type Bot struct {
-	config     BotConfig
-	client     *network.PiClient
+	config      BotConfig
+	client      *network.PiClient
 	taskManager *TaskManager
-	status     string
-	statusMux  sync.RWMutex
-	stopChan   chan struct{}
-	running    bool
-	runningMux sync.Mutex
+	status      string
+	statusMux   sync.RWMutex
+	stopChan    chan struct{}
+	running     bool
+	runningMux  sync.Mutex
 }
 
 func NewBot(config BotConfig) (*Bot, error) {
@@ -110,7 +110,7 @@ func (b *Bot) GetStatus() map[string]interface{} {
 	b.statusMux.RLock()
 	defer b.statusMux.RUnlock()
 	
-	status := gin.H{
+	status := map[string]interface{}{
 		"bot_status": b.status,
 	}
 

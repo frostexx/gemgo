@@ -5,8 +5,6 @@ import (
 	"pi/server/network"
 	"sync"
 	"time"
-
-	"github.com/gin-gonic/gin"
 )
 
 type TaskManager struct {
@@ -69,11 +67,11 @@ func (tm *TaskManager) updateStatus(workerName, status string) {
 	tm.status[workerName] = status
 }
 
-func (tm *TaskManager) GetStatus() gin.H {
+func (tm *TaskManager) GetStatus() map[string]interface{} {
 	tm.statusMux.RLock()
 	defer tm.statusMux.RUnlock()
 	
-	s := gin.H{}
+	s := make(map[string]interface{})
 	for k, v := range tm.status {
 		s[k] = v
 	}

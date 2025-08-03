@@ -30,8 +30,8 @@ func (w *TransferWorker) Run(stopChan <-chan struct{}) {
 	log.Println("TransferWorker: Initiating transfer sequence.")
 
 	// This worker can try to transfer unlocked funds.
-	// We assume it knows the destination address from config.
-	destinationAddress := "DESTINATION_WALLET_ADDRESS" // This should be in config
+	// In a real implementation, the destination address would be loaded from config.
+	// For example: destinationAddress := os.Getenv("DESTINATION_WALLET_ADDRESS")
 	fee := int64(3200000) // Use a standard fee for transfer, or make it adaptive too.
 
 	maxRetries := 10
