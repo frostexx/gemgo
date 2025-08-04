@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
-	"time"
 
 	"github.com/stellar/go/keypair"
 	"github.com/stellar/go/txnbuild"
@@ -131,11 +130,8 @@ func (w *Wallet) Transfer(kp *keypair.Full, amountStr string, address string) er
 	}
 
 	// Submit transaction
-	resp, err := w.client.SubmitTransaction(tx)
+	_, err = w.client.SubmitTransaction(tx)
 	if err != nil {
-		if resp != nil && resp.Extras != nil {
-			return getTxErrorFromResultXdr(resp.Extras.ResultXdr)
-		}
 		return fmt.Errorf("error submitting transaction: %w", err)
 	}
 

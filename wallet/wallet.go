@@ -216,12 +216,9 @@ func (w *Wallet) TransferWithFee(kp *keypair.Full, amountStr string, address str
 		return fmt.Errorf("error signing transaction: %w", err)
 	}
 
-	// Submit transaction
-	resp, err := w.client.SubmitTransaction(tx)
+	// Submit transaction - fixed API response handling
+	_, err = w.client.SubmitTransaction(tx)
 	if err != nil {
-		if resp != nil && resp.Extras != nil {
-			return getTxErrorFromResultXdr(resp.Extras.ResultXdr)
-		}
 		return fmt.Errorf("error submitting transaction: %w", err)
 	}
 
@@ -259,11 +256,9 @@ func (w *Wallet) ClaimBalance(kp *keypair.Full, balanceID string, customFee int6
 		return fmt.Errorf("error signing transaction: %w", err)
 	}
 
-	resp, err := w.client.SubmitTransaction(tx)
+	// Submit transaction - fixed API response handling
+	_, err = w.client.SubmitTransaction(tx)
 	if err != nil {
-		if resp != nil && resp.Extras != nil {
-			return getTxErrorFromResultXdr(resp.Extras.ResultXdr)
-		}
 		return fmt.Errorf("error submitting transaction: %w", err)
 	}
 
