@@ -190,7 +190,7 @@
             logStatus("1. Sending configuration...", configPayload);
 
             try {
-                const configResponse = await fetch('/configure', {
+                const configResponse = await fetch('/api/configure', { // <-- UPDATED PATH
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(configPayload),
@@ -204,7 +204,7 @@
 
                 // --- If configuration is successful, immediately start the bot ---
                 logStatus("2. Sending start command...");
-                const startResponse = await fetch('/start', { method: 'POST' });
+                const startResponse = await fetch('/api/start', { method: 'POST' }); // <-- UPDATED PATH
                 const startResult = await startResponse.json();
                 if (!startResponse.ok) {
                     throw new Error(startResult.error || `HTTP error! status: ${startResponse.status}`);
@@ -218,7 +218,7 @@
         
         async function getStatus() {
             try {
-                const response = await fetch('/status');
+                const response = await fetch('/api/status'); // <-- UPDATED PATH
                 const result = await response.json();
                  if (!response.ok) {
                     throw new Error(result.error || `HTTP error! status: ${response.status}`);

@@ -29,17 +29,20 @@ func (s *Server) Run(port string) error {
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.Default()
 
-	// --- FIX: Tell Gin to serve static files from the "public" directory ---
-	// This will serve index.html on a GET request to "/"
+	// First, serve static files from the "public" directory.
+	// This will handle the root path "/" and serve index.html.
 	router.Static("/", "./public")
 
-	// API routes are defined after the static route.
-	// If a request doesn't match a file in ./public, Gin will check these API routes.
-	handlers := NewHandlers(s)
-	router.POST("/configure", handlers.Configure)
-	router.POST("/start", handlers.Start)
-	router.POST("/stop", handlers.Stop)
-	router.GET("/status", handlers.Status)
+	// --- FIX: Group all API endpoints under the "/api" prefix ---
+	// This resolves the routing conflict.
+	api := router.Group("/api")
+	{
+		handlers := NewHandlers(s)
+		api.POST("/configure", handlers.Configure)
+		api.POST("/start", handlers.Start)
+		api.POST("/stop", handlers.Stop)
+		api.GET("/status", handlers.Status)
+	}
 
 	s.httpServer = &http.Server{
 		Addr:    port,
@@ -47,7 +50,7 @@ func (s *Server) Run(port string) error {
 	}
 
 	fmt.Printf("Bot control server listening on port %s\n", port)
-	fmt.Println("Endpoints: POST /configure, POST /start, POST /stop, GET /status")
+	fmt.Println("Serving frontend from './public' and API from '/api'")
 
 	return s.httpServer.ListenAndServe()
 }
