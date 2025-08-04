@@ -3,9 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/http"
-	"os"
 	"pi/server/core"
 	"sync"
 	"time"
@@ -33,7 +31,7 @@ func (s *Server) Run(port string) error {
 
 	// Setup routes for the new bot controller
 	handlers := NewHandlers(s)
-	router.POST("/configure", handlers.Configure) // New endpoint
+	router.POST("/configure", handlers.Configure)
 	router.POST("/start", handlers.Start)
 	router.POST("/stop", handlers.Stop)
 	router.GET("/status", handlers.Status)
