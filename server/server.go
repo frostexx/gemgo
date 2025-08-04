@@ -29,12 +29,8 @@ func (s *Server) Run(port string) error {
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.Default()
 
-	// First, serve static files from the "public" directory.
-	// This will handle the root path "/" and serve index.html.
-	router.Static("/", "./public")
-
-	// --- FIX: Group all API endpoints under the "/api" prefix ---
-	// This resolves the routing conflict.
+	// --- FIX: Define specific API routes BEFORE the general static file route. ---
+	// This ensures our API endpoints are registered first and take precedence.
 	api := router.Group("/api")
 	{
 		handlers := NewHandlers(s)
@@ -43,6 +39,10 @@ func (s *Server) Run(port string) error {
 		api.POST("/stop", handlers.Stop)
 		api.GET("/status", handlers.Status)
 	}
+
+	// Now, register the static file server. It will handle any routes
+	// not already matched by the API group.
+	router.Static("/", "./public")
 
 	s.httpServer = &http.Server{
 		Addr:    port,
