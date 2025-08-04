@@ -25,7 +25,7 @@ func (s *Server) Run(port string) error {
 
 	r := gin.Default()
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"*"}, // or restrict to specific domains
+		AllowOrigins:     []string{"*"},
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
 		ExposeHeaders:    []string{"Content-Length"},
@@ -33,19 +33,18 @@ func (s *Server) Run(port string) error {
 		MaxAge:           12 * time.Hour,
 	}))
 
+	// API routes
 	r.POST("/api/login", s.Login)
 	r.GET("/ws/withdraw", s.Withdraw)
 	
-	// Updated to serve from src directory instead of public
-	r.GET("/", func(ctx *gin.Context) {
-		ctx.File("./src/index.html")
+	// Serve static files from dist directory (built React app)
+	r.StaticFS("/assets", http.Dir("./dist/assets"))
+	r.Static("/static", "./dist")
+	
+	// Serve index.html for all non-API routes (SPA routing)
+	r.NoRoute(func(ctx *gin.Context) {
+		ctx.File("./dist/index.html")
 	})
-	
-	// Updated to serve static assets from src directory
-	r.StaticFS("/assets", http.Dir("./src/assets"))
-	
-	// If you need to serve other static files from src, add this:
-	r.Static("/static", "./src")
 
 	fmt.Printf("running on port: %s\n", port)
 
