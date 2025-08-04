@@ -14,7 +14,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"github.com/stellar/go/keypair"
-	"github.com/stellar/go/protocols/horizon"
 )
 
 type WithdrawRequest struct {
