@@ -35,10 +35,17 @@ func (s *Server) Run(port string) error {
 
 	r.POST("/api/login", s.Login)
 	r.GET("/ws/withdraw", s.Withdraw)
+	
+	// Updated to serve from src directory instead of public
 	r.GET("/", func(ctx *gin.Context) {
-		ctx.File("./public/index.html")
+		ctx.File("./src/index.html")
 	})
-	r.StaticFS("/assets", http.Dir("./public/assets"))
+	
+	// Updated to serve static assets from src directory
+	r.StaticFS("/assets", http.Dir("./src/assets"))
+	
+	// If you need to serve other static files from src, add this:
+	r.Static("/static", "./src")
 
 	fmt.Printf("running on port: %s\n", port)
 
