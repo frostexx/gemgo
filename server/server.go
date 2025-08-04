@@ -29,7 +29,12 @@ func (s *Server) Run(port string) error {
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.Default()
 
-	// Setup routes for the new bot controller
+	// --- FIX: Tell Gin to serve static files from the "public" directory ---
+	// This will serve index.html on a GET request to "/"
+	router.Static("/", "./public")
+
+	// API routes are defined after the static route.
+	// If a request doesn't match a file in ./public, Gin will check these API routes.
 	handlers := NewHandlers(s)
 	router.POST("/configure", handlers.Configure)
 	router.POST("/start", handlers.Start)
