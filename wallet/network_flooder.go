@@ -2,6 +2,7 @@ package wallet
 
 import (
 	"context"
+	"pi/config"
 	"sync"
 	"time"
 
@@ -11,13 +12,13 @@ import (
 
 type NetworkFlooder struct {
 	wallet *Wallet
-	config *Config
+	config *config.Config
 }
 
-func NewNetworkFlooder(wallet *Wallet, config *Config) *NetworkFlooder {
+func NewNetworkFlooder(wallet *Wallet, cfg *config.Config) *NetworkFlooder {
 	return &NetworkFlooder{
 		wallet: wallet,
-		config: config,
+		config: cfg,
 	}
 }
 

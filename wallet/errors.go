@@ -101,102 +101,43 @@ func (w *Wallet) Transfer(kp *keypair.Full, amountStr string, address string) er
 	}
 
 	// Build payment operation
-	paymentOp := txnbuild.Payment{
-		Destination: address,
-		Amount:      strconv.FormatFloat(requestedAmount, 'f', 7, 64),
-		Asset:       txnbuild.NativeAsset{},
+	paymentOp := &txnbuild.Payment{
+		Destination:   address,
+		Amount:        fmt.Sprintf("%.7f", requestedAmount),
+		Asset:         txnbuild.NativeAsset{},
+		SourceAccount: kp.Address(),
 	}
 
 	// Build transaction
-	txParams := txnbuild.TransactionParams{
-		SourceAccount:        &account,
-		IncrementSequenceNum: true,
-		Operations:           []txnbuild.Operation{&paymentOp},
-		BaseFee:              txnbuild.MinBaseFee,
-		Preconditions:        txnbuild.Preconditions{TimeBounds: txnbuild.NewInfiniteTimeout()},
-	}
-
-	tx, err := txnbuild.NewTransaction(txParams)
+	tx, err := txnbuild.NewTransaction(
+		txnbuild.TransactionParams{
+			SourceAccount:        &account,
+			IncrementSequenceNum: true,
+			Operations:           []txnbuild.Operation{paymentOp},
+			BaseFee:              100,
+			Preconditions: txnbuild.Preconditions{
+				TimeBounds: txnbuild.NewInfiniteTimeout(),
+			},
+		},
+	)
 	if err != nil {
 		return fmt.Errorf("error building transaction: %w", err)
 	}
 
-	// Sign and submit
-	signedTx, err := tx.Sign(w.networkPassphrase, kp)
+	// Sign transaction
+	tx, err = tx.Sign(w.networkPassphrase, kp)
 	if err != nil {
 		return fmt.Errorf("error signing transaction: %w", err)
 	}
 
-	resp, err := w.client.SubmitTransaction(signedTx)
+	// Submit transaction
+	resp, err := w.client.SubmitTransaction(tx)
 	if err != nil {
+		if resp != nil && resp.Extras != nil {
+			return getTxErrorFromResultXdr(resp.Extras.ResultXdr)
+		}
 		return fmt.Errorf("error submitting transaction: %w", err)
 	}
 
-	if !resp.Successful {
-		return getTxErrorFromResultXdr(resp.ResultXdr)
-	}
-
-	fmt.Println("Transaction successful:", resp.Hash)
 	return nil
-}
-
-func (w *Wallet) WithdrawClaimableBalance(kp *keypair.Full, amountStr, balanceID, address string) (string, float64, error) {
-	amount, err := strconv.ParseFloat(amountStr, 64)
-	if err != nil {
-		return "", 0, fmt.Errorf("error formatting amount: %s", err.Error())
-	}
-	amount = amount - 0.01
-
-	hash, err := w.ClaimAndWithdraw(kp, amount, balanceID, address)
-	if err != nil {
-		return "", amount, fmt.Errorf("error claiming and withdrawing: %v", err)
-	}
-
-	return hash, amount, nil
-}
-
-func (w *Wallet) CreateClaimable(kp *keypair.Full, recipientAddress string, amount float64) (string, error) {
-	senderAccount, err := w.GetAccount(kp)
-	if err != nil {
-		return "", err
-	}
-
-	t := time.Now().Add(10 * time.Minute)
-	claimant := txnbuild.Claimant{
-		Destination: recipientAddress,
-		Predicate:   txnbuild.NotPredicate(txnbuild.BeforeAbsoluteTimePredicate(t.Unix())),
-	}
-
-	createOp := txnbuild.CreateClaimableBalance{
-		Asset:        txnbuild.NativeAsset{},
-		Amount:       fmt.Sprintf("%.2f", amount),
-		Destinations: []txnbuild.Claimant{claimant},
-	}
-
-	txParams := txnbuild.TransactionParams{
-		SourceAccount:        &senderAccount,
-		IncrementSequenceNum: true,
-		Operations:           []txnbuild.Operation{&createOp},
-		BaseFee:              1_000_000, //txnbuild.MinBaseFee,
-		Preconditions: txnbuild.Preconditions{
-			TimeBounds: txnbuild.NewInfiniteTimeout(),
-		},
-	}
-
-	tx, err := txnbuild.NewTransaction(txParams)
-	if err != nil {
-		return "", fmt.Errorf("error building transaction: %v", err)
-	}
-
-	signedTx, err := tx.Sign(w.networkPassphrase, kp)
-	if err != nil {
-		return "", fmt.Errorf("error signing transaction: %v", err)
-	}
-
-	resp, err := w.client.SubmitTransaction(signedTx)
-	if err != nil {
-		return "", fmt.Errorf("error submitting transaction: %v", err)
-	}
-
-	return resp.Hash, nil
 }

@@ -131,10 +131,7 @@ func (w *Wallet) GetLockedBalances(kp *keypair.Full) ([]horizon.ClaimableBalance
 }
 
 func (w *Wallet) GetClaimableBalance(balanceID string) (horizon.ClaimableBalance, error) {
-	cbReq := hClient.ClaimableBalanceRequest{
-		BalanceID: balanceID,
-	}
-	cb, err := w.client.ClaimableBalance(cbReq)
+	cb, err := w.client.ClaimableBalance(balanceID)
 	if err != nil {
 		return horizon.ClaimableBalance{}, fmt.Errorf("error fetching claimable balance: %v", err)
 	}

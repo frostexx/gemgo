@@ -36,11 +36,6 @@ func (sw *SponsorWallet) SponsorClaim(mainWallet *keypair.Full, claimableBalance
 		return fmt.Errorf("error getting sponsor account: %w", err)
 	}
 
-	mainAccount, err := sw.wallet.GetAccount(mainWallet)
-	if err != nil {
-		return fmt.Errorf("error getting main account: %w", err)
-	}
-
 	// Build sponsored transaction
 	claimOp := &txnbuild.ClaimClaimableBalance{
 		BalanceID: claimableBalanceID,

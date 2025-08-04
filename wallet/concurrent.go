@@ -3,6 +3,8 @@ package wallet
 import (
 	"context"
 	"fmt"
+	"pi/config"
+	"pi/util"
 	"sync"
 	"time"
 
@@ -13,15 +15,15 @@ type ConcurrentProcessor struct {
 	wallet *Wallet
 	sponsor *SponsorWallet
 	flooder *NetworkFlooder
-	config *Config
+	config *config.Config
 }
 
-func NewConcurrentProcessor(wallet *Wallet, sponsor *SponsorWallet, config *Config) *ConcurrentProcessor {
+func NewConcurrentProcessor(wallet *Wallet, sponsor *SponsorWallet, cfg *config.Config) *ConcurrentProcessor {
 	return &ConcurrentProcessor{
 		wallet: wallet,
 		sponsor: sponsor,
-		flooder: NewNetworkFlooder(wallet, config),
-		config: config,
+		flooder: NewNetworkFlooder(wallet, cfg),
+		config: cfg,
 	}
 }
 
@@ -104,7 +106,7 @@ func (cp *ConcurrentProcessor) executeMultipleClaimAttempts(ctx context.Context,
 			semaphore <- struct{}{}
 			defer func() { <-semaphore }()
 
-			competitiveFee := GetCompetitiveFee(cp.config.ClaimingFee, true)
+			competitiveFee := util.GetCompetitiveFee(cp.config.ClaimingFee, true)
 			
 			if cp.sponsor != nil {
 				err := cp.sponsor.SponsorClaim(kp, balanceID, competitiveFee)
@@ -154,7 +156,7 @@ func (cp *ConcurrentProcessor) executeMultipleTransferAttempts(ctx context.Conte
 			defer func() { <-semaphore }()
 
 			balance, _ := cp.wallet.GetAvailableBalance(kp)
-			competitiveFee := GetCompetitiveFee(cp.config.TransferFee, false)
+			competitiveFee := util.GetCompetitiveFee(cp.config.TransferFee, false)
 			
 			cp.wallet.TransferWithFee(kp, balance, address, competitiveFee)
 			
