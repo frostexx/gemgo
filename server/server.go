@@ -29,8 +29,7 @@ func (s *Server) Run(port string) error {
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.Default()
 
-	// --- FIX: Define specific API routes BEFORE the general static file route. ---
-	// This ensures our API endpoints are registered first and take precedence.
+	// Define the specific API routes. This creates a route for /api/...
 	api := router.Group("/api")
 	{
 		handlers := NewHandlers(s)
@@ -40,9 +39,10 @@ func (s *Server) Run(port string) error {
 		api.GET("/status", handlers.Status)
 	}
 
-	// Now, register the static file server. It will handle any routes
-	// not already matched by the API group.
-	router.Static("/", "./public")
+	// --- FIX: Use StaticFile to map the root URL "/" to the index.html file. ---
+	// This creates a single, non-conflicting route for the frontend.
+	// It does NOT create a greedy wildcard.
+	router.StaticFile("/", "./public/index.html")
 
 	s.httpServer = &http.Server{
 		Addr:    port,
@@ -50,7 +50,7 @@ func (s *Server) Run(port string) error {
 	}
 
 	fmt.Printf("Bot control server listening on port %s\n", port)
-	fmt.Println("Serving frontend from './public' and API from '/api'")
+	fmt.Println("Serving frontend from './public/index.html' and API from '/api'")
 
 	return s.httpServer.ListenAndServe()
 }
