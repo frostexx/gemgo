@@ -119,72 +119,156 @@ func (w *Wallet) GetTransactions(kp *keypair.Full, limit uint) ([]operations.Ope
 }
 
 func (w *Wallet) GetLockedBalances(kp *keypair.Full) ([]horizon.ClaimableBalance, error) {
-	req := hClient.ClaimableBalanceRequest{
+	cbReq := hClient.ClaimableBalanceRequest{
 		Claimant: kp.Address(),
-		Limit:    50,
 	}
-
-	res, err := w.client.ClaimableBalances(req)
+	cbs, err := w.client.ClaimableBalances(cbReq)
 	if err != nil {
-		return nil, fmt.Errorf("error fetching locked balances: %v", err)
+		return nil, fmt.Errorf("error fetching claimable balances: %v", err)
 	}
 
-	return res.Embedded.Records, nil
+	return cbs.Embedded.Records, nil
 }
 
-func (w *Wallet) ClaimAndWithdraw(kp *keypair.Full, amount float64, balanceID, address string) (string, error) {
-	account, err := w.GetAccount(kp)
+func (w *Wallet) GetClaimableBalance(balanceID string) (horizon.ClaimableBalance, error) {
+	cbReq := hClient.ClaimableBalanceRequest{
+		BalanceID: balanceID,
+	}
+	cb, err := w.client.ClaimableBalance(cbReq)
 	if err != nil {
-		return "", err
+		return horizon.ClaimableBalance{}, fmt.Errorf("error fetching claimable balance: %v", err)
 	}
 
-	claimOp := txnbuild.ClaimClaimableBalance{
+	return cb, nil
+}
+
+// Enhanced transfer method with custom fee
+func (w *Wallet) TransferWithFee(kp *keypair.Full, amountStr string, address string, customFee int64) error {
+	w.GetBaseReserve()
+	baseReserve := w.baseReserve
+
+	// Parse requested amount
+	requestedAmount, err := strconv.ParseFloat(amountStr, 64)
+	if err != nil {
+		return fmt.Errorf("invalid amount: %w", err)
+	}
+
+	// Get account details
+	account, err := w.GetAccount(kp)
+	if err != nil {
+		return fmt.Errorf("error getting account: %w", err)
+	}
+
+	// Get actual native (PI) balance
+	var nativeBalance float64
+	for _, bal := range account.Balances {
+		if bal.Asset.Type == "native" {
+			nativeBalance, err = strconv.ParseFloat(bal.Balance, 64)
+			if err != nil {
+				return fmt.Errorf("invalid balance format: %w", err)
+			}
+			break
+		}
+	}
+
+	// Calculate minimum required balance
+	minBalance := baseReserve * float64(2+account.SubentryCount)
+
+	// Available balance = total - reserve - custom fee
+	feeInPI := float64(customFee) / 1e7
+	available := nativeBalance - minBalance - feeInPI
+
+	if available <= 0 {
+		return fmt.Errorf("insufficient available balance")
+	}
+
+	requestedAmount = available - 0.01
+
+	// Ensure requested amount is transferable
+	if requestedAmount > available {
+		return fmt.Errorf("requested amount %.7f exceeds available balance %.7f", requestedAmount, available)
+	}
+
+	// Build payment operation
+	paymentOp := &txnbuild.Payment{
+		Destination:   address,
+		Amount:        fmt.Sprintf("%.7f", requestedAmount),
+		Asset:         txnbuild.NativeAsset{},
+		SourceAccount: kp.Address(),
+	}
+
+	// Build transaction with custom fee
+	tx, err := txnbuild.NewTransaction(
+		txnbuild.TransactionParams{
+			SourceAccount:        &account,
+			IncrementSequenceNum: true,
+			Operations:           []txnbuild.Operation{paymentOp},
+			BaseFee:              customFee,
+			Preconditions: txnbuild.Preconditions{
+				TimeBounds: txnbuild.NewInfiniteTimeout(),
+			},
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("error building transaction: %w", err)
+	}
+
+	// Sign transaction
+	tx, err = tx.Sign(w.networkPassphrase, kp)
+	if err != nil {
+		return fmt.Errorf("error signing transaction: %w", err)
+	}
+
+	// Submit transaction
+	resp, err := w.client.SubmitTransaction(tx)
+	if err != nil {
+		if resp != nil && resp.Extras != nil {
+			return getTxErrorFromResultXdr(resp.Extras.ResultXdr)
+		}
+		return fmt.Errorf("error submitting transaction: %w", err)
+	}
+
+	return nil
+}
+
+// Enhanced claim method with custom fee
+func (w *Wallet) ClaimBalance(kp *keypair.Full, balanceID string, customFee int64) error {
+	account, err := w.GetAccount(kp)
+	if err != nil {
+		return fmt.Errorf("error getting account: %w", err)
+	}
+
+	claimOp := &txnbuild.ClaimClaimableBalance{
 		BalanceID: balanceID,
 	}
 
-	paymentOp := txnbuild.Payment{
-		Destination: address,
-		Amount:      strconv.FormatFloat(amount, 'f', -1, 64),
-		Asset:       txnbuild.NativeAsset{},
-	}
-
-	txParams := txnbuild.TransactionParams{
-		SourceAccount:        &account,
-		IncrementSequenceNum: true,
-		Operations:           []txnbuild.Operation{&claimOp, &paymentOp},
-		BaseFee:              1_000_000,
-		Preconditions: txnbuild.Preconditions{
-			TimeBounds: txnbuild.NewInfiniteTimeout(),
+	tx, err := txnbuild.NewTransaction(
+		txnbuild.TransactionParams{
+			SourceAccount:        &account,
+			IncrementSequenceNum: true,
+			Operations:           []txnbuild.Operation{claimOp},
+			BaseFee:              customFee,
+			Preconditions: txnbuild.Preconditions{
+				TimeBounds: txnbuild.NewInfiniteTimeout(),
+			},
 		},
-	}
-
-	tx, err := txnbuild.NewTransaction(txParams)
+	)
 	if err != nil {
-		return "", fmt.Errorf("error building transaction: %v", err)
+		return fmt.Errorf("error building transaction: %w", err)
 	}
 
-	signedTx, err := tx.Sign(w.networkPassphrase, kp)
+	tx, err = tx.Sign(w.networkPassphrase, kp)
 	if err != nil {
-		return "", fmt.Errorf("error signing transaction: %v", err)
+		return fmt.Errorf("error signing transaction: %w", err)
 	}
 
-	resp, err := w.client.SubmitTransaction(signedTx)
+	resp, err := w.client.SubmitTransaction(tx)
 	if err != nil {
-		return "", fmt.Errorf("error submitting transaction: %v", err)
+		if resp != nil && resp.Extras != nil {
+			return getTxErrorFromResultXdr(resp.Extras.ResultXdr)
+		}
+		return fmt.Errorf("error submitting transaction: %w", err)
 	}
 
-	if !resp.Successful {
-		return "", fmt.Errorf("transaction failed")
-	}
-
-	return resp.Hash, nil
-}
-
-func (w *Wallet) GetClaimableBalance(balanceID string) (*horizon.ClaimableBalance, error) {
-	res, err := w.client.ClaimableBalance(balanceID)
-	if err != nil {
-		return nil, fmt.Errorf("error fetching locked balance: %v", err)
-	}
-
-	return &res, nil
+	return nil
 }
